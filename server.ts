@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { keyPool } from './server/keyPool.ts';
 import { dataStore } from './server/dataStore.ts';
@@ -11,7 +12,21 @@ async function startServer() {
   app.use(express.json());
 
   // --- ADMIN AUTHENTICATION CONFIGURATION ---
-  let runtimeAdminPassword = process.env.ADMIN_PASSWORD || 'admin@licensetech2026';
+  const ADMIN_CONFIG_FILE = path.join(process.cwd(), 'admin_config.json');
+  let savedFilePassword: string | null = null;
+  try {
+    if (fs.existsSync(ADMIN_CONFIG_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(ADMIN_CONFIG_FILE, 'utf-8'));
+      if (parsed && typeof parsed.adminPassword === 'string' && parsed.adminPassword.length >= 6) {
+        savedFilePassword = parsed.adminPassword;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not read admin_config.json:', err);
+  }
+
+  // Priority: 1. ENV variable (if set by user on Vercel/Cloud Run) -> 2. Persistent file -> 3. Default
+  let runtimeAdminPassword = process.env.ADMIN_PASSWORD || savedFilePassword || 'admin@licensetech2026';
   let runtimeAdminToken = 'licensetech_adm_' + Buffer.from(runtimeAdminPassword).toString('base64');
 
   const requireAdminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -59,7 +74,20 @@ async function startServer() {
     }
     runtimeAdminPassword = newPassword;
     runtimeAdminToken = 'licensetech_adm_' + Buffer.from(newPassword).toString('base64');
-    return res.json({ success: true, newToken: runtimeAdminToken });
+    try {
+      fs.writeFileSync(
+        ADMIN_CONFIG_FILE,
+        JSON.stringify({ adminPassword: newPassword, updatedAt: new Date().toISOString() }, null, 2),
+        'utf-8'
+      );
+    } catch (writeErr) {
+      console.warn('Failed to write admin_config.json:', writeErr);
+    }
+    return res.json({
+      success: true,
+      message: 'Cập nhật mật khẩu quản trị thành công!',
+      newToken: runtimeAdminToken,
+    });
   });
 
   // Health check

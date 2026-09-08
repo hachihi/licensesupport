@@ -14,11 +14,18 @@ import {
   RefreshCw,
   Search,
   Eye,
+  EyeOff,
   Terminal,
   Activity,
   Zap,
   Sliders,
   Check,
+  Lock,
+  Shield,
+  KeyRound,
+  Copy,
+  ExternalLink,
+  ShieldCheck,
 } from 'lucide-react';
 import { formatDate, formatDateTime } from '../utils/helpers';
 
@@ -35,6 +42,7 @@ interface AdminCMSProps {
   onAddBackupKey: (key: string, label: string) => Promise<{ success: boolean; message: string }>;
   onTestKey: (id: string) => Promise<{ success: boolean; message: string; latencyMs: number }>;
   onResetKey: (id: string) => Promise<boolean>;
+  onChangePassword?: (newPassword: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 export const AdminCMS: React.FC<AdminCMSProps> = ({
@@ -50,10 +58,20 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
   onAddBackupKey,
   onTestKey,
   onResetKey,
+  onChangePassword,
 }) => {
-  const [activeTab, setActiveTab] = useState<'articles' | 'categories' | 'keys' | 'inquiries'>('articles');
+  const [activeTab, setActiveTab] = useState<'articles' | 'categories' | 'keys' | 'inquiries' | 'security'>('articles');
   const [articleSearch, setArticleSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+
+  // Change Password state
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStatusMsg, setPasswordStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [copiedEnv, setCopiedEnv] = useState(false);
 
   // Modal states for Article
   const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
@@ -173,6 +191,55 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
     setTimeout(() => setKeyActionMsg(null), 4000);
   };
 
+  // Handle Change Password Submit
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPasswordInput.length < 6) {
+      setPasswordStatusMsg({ type: 'error', text: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+      return;
+    }
+    if (newPasswordInput !== confirmPasswordInput) {
+      setPasswordStatusMsg({ type: 'error', text: 'Mật khẩu xác nhận không khớp' });
+      return;
+    }
+    if (!onChangePassword) {
+      setPasswordStatusMsg({ type: 'error', text: 'Hệ thống chưa thiết lập tính năng đổi mật khẩu' });
+      return;
+    }
+
+    setIsSubmittingPassword(true);
+    setPasswordStatusMsg(null);
+    try {
+      const res = await onChangePassword(newPasswordInput);
+      if (res.success) {
+        setPasswordStatusMsg({
+          type: 'success',
+          text: res.message || 'Đã cập nhật mật khẩu quản trị thành công!',
+        });
+        setNewPasswordInput('');
+        setConfirmPasswordInput('');
+      } else {
+        setPasswordStatusMsg({
+          type: 'error',
+          text: res.message || 'Không thể cập nhật mật khẩu',
+        });
+      }
+    } catch (err: any) {
+      setPasswordStatusMsg({
+        type: 'error',
+        text: err.message || 'Lỗi xử lý đổi mật khẩu',
+      });
+    } finally {
+      setIsSubmittingPassword(false);
+    }
+  };
+
+  const handleCopyEnvConfig = () => {
+    navigator.clipboard.writeText('ADMIN_PASSWORD="mat_khau_moi_cua_ban"');
+    setCopiedEnv(true);
+    setTimeout(() => setCopiedEnv(false), 2500);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
       {/* Top Header */}
@@ -248,6 +315,18 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
         >
           <Mail className="w-4 h-4" />
           Hộp thư Liên hệ ({safeInquiries.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('security')}
+          className={`px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition cursor-pointer ${
+            activeTab === 'security'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <Lock className="w-4 h-4 text-rose-500" />
+          Bảo Mật & Đổi Mật Khẩu
         </button>
       </div>
 
@@ -678,6 +757,189 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: SECURITY & PASSWORD CHANGE */}
+      {activeTab === 'security' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Shield className="w-5 h-5 text-rose-500" />
+                Bảo Mật & Đổi Mật Khẩu Quản Trị
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Quản lý mật khẩu truy cập hệ thống CMS và phân quyền bể khóa Multi-Key Gemini.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Form Đổi Mật Khẩu Trực Tiếp */}
+            <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-5">
+              <div className="flex items-center gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                    Đổi Mật Khẩu Trực Tiếp (Có hiệu lực ngay)
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Cập nhật mật khẩu quản trị tức thì cho toàn bộ máy chủ mà không cần khởi động lại.
+                  </p>
+                </div>
+              </div>
+
+              {passwordStatusMsg && (
+                <div
+                  className={`p-4 rounded-xl flex items-center gap-3 text-xs sm:text-sm font-medium ${
+                    passwordStatusMsg.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                      : 'bg-rose-50 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                  }`}
+                >
+                  {passwordStatusMsg.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                  )}
+                  <span>{passwordStatusMsg.text}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                    Mật khẩu mới (Tối thiểu 6 ký tự) *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={newPasswordInput}
+                      onChange={(e) => setNewPasswordInput(e.target.value)}
+                      placeholder="Nhập mật khẩu mới..."
+                      className="w-full pl-3.5 pr-10 py-2.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                    Nhập lại mật khẩu mới để xác nhận *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={confirmPasswordInput}
+                      onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                      placeholder="Xác nhận lại mật khẩu mới..."
+                      className="w-full pl-3.5 pr-10 py-2.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
+                    <ShieldCheck className="w-4 h-4 text-blue-500" />
+                    Lưu ý về phiên đăng nhập
+                  </div>
+                  <p>
+                    Sau khi đổi thành công, hệ thống tự động cập nhật token trong trình duyệt để bạn tiếp tục quản trị mà không cần đăng nhập lại.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingPassword}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmittingPassword ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Đang cập nhật mật khẩu...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4" />
+                      <span>Cập Nhật Mật Khẩu Quản Trị</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+
+            {/* Hướng Dẫn Cấu Hình Biến Môi Trường Vercel */}
+            <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center">
+                  <ExternalLink className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                    Cấu Hình Biến Môi Trường (Vercel)
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Khuyên dùng khi triển khai dự án lên Vercel hoặc Cloud
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                <p>
+                  Nếu bạn triển khai web lên <strong>Vercel</strong>, bạn có thể thiết lập mật khẩu cố định qua biến môi trường để đảm bảo mật khẩu không bị reset khi redeploy:
+                </p>
+
+                <ol className="list-decimal list-inside space-y-1.5 pl-1 font-medium text-slate-700 dark:text-slate-200">
+                  <li>Vào <strong>Vercel Dashboard</strong> &rarr; Chọn Project.</li>
+                  <li>Nhấp vào tab <strong>Settings</strong> &rarr; Mục <strong>Environment Variables</strong>.</li>
+                  <li>Thêm biến mới:
+                    <div className="mt-1.5 p-2.5 bg-slate-950 text-slate-200 rounded-lg font-mono text-[11px] flex items-center justify-between">
+                      <span>ADMIN_PASSWORD="mat_khau_cua_ban"</span>
+                      <button
+                        type="button"
+                        onClick={handleCopyEnvConfig}
+                        className="text-slate-400 hover:text-white transition flex items-center gap-1 cursor-pointer"
+                        title="Sao chép"
+                      >
+                        {copiedEnv ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span className="text-[10px]">{copiedEnv ? 'Đã chép' : 'Sao chép'}</span>
+                      </button>
+                    </div>
+                  </li>
+                  <li>Bấm <strong>Save</strong> và Redeploy lại bản build mới nhất.</li>
+                </ol>
+
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 space-y-1 text-[11px]">
+                  <strong>Thứ tự ưu tiên mật khẩu:</strong>
+                  <ul className="list-disc list-inside space-y-0.5 mt-0.5">
+                    <li>1. Biến môi trường Vercel (<code className="font-bold">ADMIN_PASSWORD</code>)</li>
+                    <li>2. Mật khẩu đổi trực tiếp tại form CMS bên cạnh</li>
+                    <li>3. Mặc định gốc: <code className="font-bold">admin@licensetech2026</code></li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </div>

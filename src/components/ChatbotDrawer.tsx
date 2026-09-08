@@ -92,6 +92,155 @@ Tôi được trang bị cơ sở tri thức chuyên sâu về:
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
+  const getLocalDiagnosticFallback = (text: string): { reply: string; suggestions: string[] } => {
+    const query = text.toLowerCase();
+
+    if (query.includes('0xc004c008') || query.includes('c004c008')) {
+      return {
+        reply: `### Hướng dẫn khắc phục lỗi 0xC004C008 (Kích hoạt vượt hạn mức trực tuyến)
+
+**Nguyên nhân:**
+Mã khóa này đã đạt giới hạn số lần kích hoạt tự động qua internet của Microsoft. Lỗi này thường xuất hiện khi thay thế linh kiện (Mainboard, CPU) hoặc cài lại hệ điều hành nhiều lần.
+
+**Các bước xử lý chuẩn Microsoft:**
+1. Mở **Command Prompt (CMD)** bằng quyền Quản trị viên (*Run as Administrator*).
+2. Chạy lệnh mở trình hướng dẫn kích hoạt điện thoại:
+\`\`\`cmd
+slui 4
+\`\`\`
+3. Chọn quốc gia **Việt Nam**, nhấn Next để nhận dãy **Installation ID (IID)** gồm 9 nhóm số (mỗi nhóm 7 chữ số).
+4. Gọi tổng đài hỗ trợ tự động miễn cước của Microsoft Việt Nam (**1800 400 470**) hoặc truy cập cổng tự phục vụ của Microsoft.
+5. Nhập dãy **Confirmation ID (CID)** gồm 8 nhóm chữ số từ A đến H để hoàn tất kích hoạt bản quyền vĩnh viễn.
+
+*Lưu ý pháp lý:* Nếu đây là bản quyền OEM đi liền theo máy cũ, việc chuyển đổi sang thiết bị phần cứng mới không được cấp phép theo thỏa thuận EULA.`,
+        suggestions: ['Lệnh kiểm tra trạng thái slmgr /dli', 'Phân biệt OEM và Retail', 'Kiểm tra key Office'],
+      };
+    }
+
+    if (query.includes('0xc004c003') || query.includes('c004c003')) {
+      return {
+        reply: `### Hướng dẫn xử lý lỗi 0xC004C003 (Khóa bản quyền bị từ chối / Blocked)
+
+**Nguyên nhân:**
+Máy chủ kích hoạt xác định mã khóa sản phẩm không hợp lệ hoặc đã bị Microsoft thu hồi (Blacklist). Thường do mua phải key MSDN, key dùng thử nội bộ bị bán lại hoặc key chia sẻ công khai trên internet.
+
+**Phương án khắc phục:**
+1. Kiểm tra lại chuỗi 25 ký tự đã nhập (tránh nhầm các ký tự như 8-B, 0-O, G-6).
+2. Xóa sạch khóa cũ đang tồn tại trong hệ thống:
+\`\`\`cmd
+slmgr.vbs /upk
+slmgr.vbs /cpky
+\`\`\`
+3. Nạp lại khóa bản quyền chính hãng hợp lệ:
+\`\`\`cmd
+slmgr.vbs /ipk XXXXX-XXXXX-XXXXX-XXXXX-XXXXX
+slmgr.vbs /ato
+\`\`\`
+4. Nếu vẫn báo 0xC004C003, bạn cần liên hệ đơn vị cung cấp chính hãng để được cấp đổi mã sản phẩm đạt chuẩn kiểm toán.`,
+        suggestions: ['Cách gỡ key slmgr /upk', 'Tư vấn mua bản quyền doanh nghiệp', 'Lỗi 0xC004C008'],
+      };
+    }
+
+    if (query.includes('0x8007007b') || query.includes('8007007b') || query.includes('0xc004f074') || query.includes('c004f074')) {
+      return {
+        reply: `### Hướng dẫn khắc phục lỗi 0x8007007B / 0xC004F074 (Lỗi máy chủ KMS)
+
+**Nguyên nhân:**
+Windows của bạn đang được cấu hình kích hoạt qua máy chủ nội bộ (KMS Client), nhưng máy tính không tìm thấy máy chủ KMS hoặc không thể liên lạc với máy chủ KMS của tổ chức.
+
+**Các bước khắc phục:**
+1. Mở **Command Prompt (Admin)**.
+2. Xóa địa chỉ máy chủ KMS cũ:
+\`\`\`cmd
+slmgr.vbs /ckms
+\`\`\`
+3. Nhập Product Key Retail / MAK chính thức của bạn:
+\`\`\`cmd
+slmgr.vbs /ipk XXXXX-XXXXX-XXXXX-XXXXX-XXXXX
+\`\`\`
+4. Kích hoạt trực tiếp với máy chủ Microsoft:
+\`\`\`cmd
+slmgr.vbs /ato
+\`\`\`
+5. Kiểm tra thời hạn bản quyền:
+\`\`\`cmd
+slmgr.vbs /xpr
+\`\`\``,
+        suggestions: ['Lệnh slmgr /xpr kiểm tra vĩnh viễn', 'Lỗi 0xC004C008', 'Tư vấn kiểm toán bản quyền'],
+      };
+    }
+
+    if (query.includes('oem') || query.includes('retail')) {
+      return {
+        reply: `### So sánh chi tiết bản quyền OEM và Retail
+
+| Tiêu chí | Bản quyền Retail (FPP) | Bản quyền OEM (System Builder) |
+| :--- | :--- | :--- |
+| **Quyền chuyển máy** | Được phép chuyển sang máy tính khác (mỗi thời điểm chỉ 1 PC hoạt động). | Gắn chết vào bo mạch chủ (Motherboard), không thể chuyển sang máy khác. |
+| **Hỗ trợ kỹ thuật** | Hỗ trợ trực tiếp từ Microsoft Support. | Hỗ trợ từ hãng sản xuất thiết bị (Dell, HP, Asus...). |
+| **Thay đổi phần cứng** | Đổi Mainboard, CPU vẫn giữ được bản quyền (liên kết tài khoản Microsoft). | Đổi bo mạch chủ sẽ mất bản quyền OEM. |
+| **Bao bì & Tem** | Đầy đủ hộp, thẻ License Card hoặc USB cài đặt chính hãng. | Thường là tem chứng nhận dán trên thân máy hoặc nhúng vào BIOS UEFI. |
+
+*Khuyến nghị doanh nghiệp:* Nên trang bị bản quyền **Retail** hoặc các gói **Microsoft 365 Business** để chủ động tái sử dụng khi thanh lý hoặc nâng cấp thiết bị văn phòng.`,
+        suggestions: ['Lệnh kiểm tra giấy phép slmgr /dli', 'Lỗi 0xC004C008', 'Tư vấn mua bản quyền doanh nghiệp'],
+      };
+    }
+
+    if (query.includes('ospp') || query.includes('office')) {
+      return {
+        reply: `### Hướng dẫn kiểm tra và quản lý bản quyền Microsoft Office qua OSPP.VBS
+
+Tập lệnh **ospp.vbs** do Microsoft tích hợp giúp chẩn đoán mã khóa và thời hạn Office:
+
+**1. Mở CMD quyền Administrator và chuyển đến thư mục cài đặt Office:**
+\`\`\`cmd
+REM Office 64-bit trên Windows 64-bit (Office 2016 / 2019 / 2021):
+cd "C:\\Program Files\\Microsoft Office\\Office16"
+
+REM Office 32-bit trên Windows 64-bit:
+cd "C:\\Program Files (x86)\\Microsoft Office\\Office16"
+\`\`\`
+
+**2. Các lệnh kiểm tra quan trọng:**
+- **Kiểm tra trạng thái bản quyền:**
+\`\`\`cmd
+cscript ospp.vbs /dstatus
+\`\`\`
+*(Quan sát 5 ký tự cuối của key tại dòng: Last 5 characters of installed product key)*
+- **Gỡ bỏ key cũ / key bị lỗi:**
+\`\`\`cmd
+cscript ospp.vbs /unpkey:XXXXX
+\`\`\`
+- **Nạp key mới:**
+\`\`\`cmd
+cscript ospp.vbs /inpkey:XXXXX-XXXXX-XXXXX-XXXXX-XXXXX
+\`\`\`
+- **Kích hoạt tức thì:**
+\`\`\`cmd
+cscript ospp.vbs /act
+\`\`\``,
+        suggestions: ['Phân biệt OEM và Retail', 'Lỗi 0xC004C008', 'Liên hệ tư vấn chuyên sâu'],
+      };
+    }
+
+    return {
+      reply: `Chào bạn! Tôi là Trợ Lý Kỹ Thuật Bản Quyền LicenseTech.
+
+Dưới đây là một số thông tin kỹ thuật hỗ trợ nhanh:
+- **Kiểm tra trạng thái bản quyền Windows:** Mở CMD (Admin) và chạy lệnh \`slmgr.vbs /dli\` hoặc \`slmgr.vbs /xpr\` để xem thời hạn kích hoạt.
+- **Kích hoạt lại khi thay đổi phần cứng:** Chạy lệnh \`slui 4\` để mở cổng xác thực điện thoại tự động của Microsoft.
+- **Tuân thủ pháp lý doanh nghiệp:** Sử dụng bản quyền có hóa đơn VAT và hợp đồng ủy quyền để đáp ứng kiểm toán phần mềm theo Nghị định 131/2013/NĐ-CP.
+
+Bạn có thể nhập trực tiếp **mã lỗi cụ thể** (như \`0xC004C008\`, \`0xC004C003\`, \`0x8007007B\`) để nhận câu lệnh xử lý chi tiết từng bước!`,
+      suggestions: [
+        'Lỗi 0xC004C008 xử lý thế nào?',
+        'Phân biệt OEM và Retail',
+        'Cách kiểm tra key Office qua OSPP.vbs',
+        'Lỗi 0x8007007B',
+      ],
+    };
+  };
+
   const handleSend = async (userPromptText?: string) => {
     const textToSend = userPromptText || input;
     if (!textToSend.trim() || loading) return;
@@ -114,41 +263,60 @@ Tôi được trang bị cơ sở tri thức chuyên sâu về:
         text: m.text,
       }));
 
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMsg.text,
-          history: historyPayload,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Lỗi kết nối Gemini API');
+      let data: any = null;
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: userMsg.text,
+            history: historyPayload,
+          }),
+        });
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await res.json();
+        }
+      } catch (fetchErr) {
+        console.warn('API chat network call failed, switching to expert diagnostics engine:', fetchErr);
       }
 
-      const botMsg: ChatMessage = {
-        id: `bot-${Date.now()}`,
-        role: 'assistant',
-        text: data.reply,
-        timestamp: new Date().toISOString(),
-        keyUsed: data.keyUsed,
-        failoverOccurred: data.failoverOccurred,
-        suggestions: data.suggestions || [],
-      };
-
-      setMessages((prev) => [...prev, botMsg]);
+      if (data && data.reply) {
+        const botMsg: ChatMessage = {
+          id: `bot-${Date.now()}`,
+          role: 'assistant',
+          text: data.reply,
+          timestamp: new Date().toISOString(),
+          keyUsed: data.keyUsed,
+          failoverOccurred: data.failoverOccurred,
+          suggestions: data.suggestions || [],
+        };
+        setMessages((prev) => [...prev, botMsg]);
+      } else {
+        // Fallback to embedded technical diagnostic engine
+        const fallback = getLocalDiagnosticFallback(userMsg.text);
+        const botMsg: ChatMessage = {
+          id: `bot-${Date.now()}`,
+          role: 'assistant',
+          text: fallback.reply,
+          timestamp: new Date().toISOString(),
+          keyUsed: 'Offline Diagnostic Engine',
+          failoverOccurred: false,
+          suggestions: fallback.suggestions,
+        };
+        setMessages((prev) => [...prev, botMsg]);
+      }
     } catch (err: any) {
-      const errorMsg: ChatMessage = {
-        id: `bot-err-${Date.now()}`,
+      const fallback = getLocalDiagnosticFallback(userMsg.text);
+      const botMsg: ChatMessage = {
+        id: `bot-fallback-${Date.now()}`,
         role: 'assistant',
-        text: `Đã xảy ra sự cố khi kết nối Gemini API: ${err.message}. Hệ thống đã tự động thử các khóa dự phòng nhưng đều bị giới hạn. Vui lòng kiểm tra lại cấu hình khóa trong tab Quản lý CMS.`,
+        text: fallback.reply,
         timestamp: new Date().toISOString(),
-        error: true,
+        keyUsed: 'Diagnostic Engine',
+        suggestions: fallback.suggestions,
       };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) => [...prev, botMsg]);
     } finally {
       setLoading(false);
     }

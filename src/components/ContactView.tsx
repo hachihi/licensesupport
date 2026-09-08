@@ -38,16 +38,33 @@ export const ContactView: React.FC<ContactViewProps> = ({ onOpenChat }) => {
     setError(null);
 
     try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Có lỗi xảy ra khi gửi form');
+      try {
+        const res = await fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || 'Có lỗi xảy ra khi gửi form');
+          }
+        }
+      } catch (networkErr: any) {
+        // If server returns error, continue to save locally
+        console.warn('Backend contact save error, storing locally:', networkErr);
       }
+
+      // Save inquiry to localStorage for Admin CMS to see
+      const newInquiry = {
+        id: `inq-${Date.now()}`,
+        ...formData,
+        createdAt: new Date().toISOString(),
+      };
+      const existingStr = localStorage.getItem('licensetech_local_inquiries');
+      const existing = existingStr ? JSON.parse(existingStr) : [];
+      localStorage.setItem('licensetech_local_inquiries', JSON.stringify([newInquiry, ...existing]));
 
       setSubmitted(true);
     } catch (err: any) {

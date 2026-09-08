@@ -104,13 +104,16 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
 
           {/* Quick Help for Default Setup */}
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5">
             <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
               <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
-              <span>Ghi chú thiết lập:</span>
+              <span>Ghi chú thiết lập & Đổi mật khẩu:</span>
             </div>
             <p>
               Mật khẩu mặc định khởi tạo: <code className="font-mono text-blue-600 dark:text-blue-400 font-bold bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">admin@licensetech2026</code>
+            </p>
+            <p className="text-[10.5px] text-slate-500 dark:text-slate-400 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 leading-relaxed">
+              🔑 <strong>Muốn đổi mật khẩu?</strong> Sau khi đăng nhập, hãy chuyển sang tab <strong>Bảo Mật & Đổi Mật Khẩu</strong> trong CMS để đổi trực tiếp, hoặc thiết lập biến môi trường <code className="font-mono font-semibold text-slate-700 dark:text-slate-300">ADMIN_PASSWORD</code> trong <em>Vercel Project Settings &gt; Environment Variables</em>.
             </p>
           </div>
 

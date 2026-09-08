@@ -15,6 +15,9 @@ import {
   Mail,
   Sparkles,
   CheckCircle2,
+  Lock,
+  LogOut,
+  Shield,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -26,6 +29,9 @@ interface HeaderProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   activeKeyCount: number;
+  isAdmin?: boolean;
+  onOpenAdminLogin?: () => void;
+  onAdminLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,6 +43,9 @@ export const Header: React.FC<HeaderProps> = ({
   searchQuery,
   onSearchChange,
   activeKeyCount,
+  isAdmin = false,
+  onOpenAdminLogin,
+  onAdminLogout,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -146,18 +155,25 @@ export const Header: React.FC<HeaderProps> = ({
             <FileText className="w-4 h-4" />
             Chuyên đề kỹ thuật
           </button>
-          <button
-            onClick={() => handleNavClick('cms')}
-            className={`px-3 py-2 rounded-lg transition flex items-center gap-1.5 relative ${
-              currentTab === 'cms'
-                ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 font-semibold'
-                : 'text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            Quản lý CMS
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-          </button>
+
+          {/* CMS tab is ONLY visible to logged-in Admin */}
+          {isAdmin && (
+            <button
+              onClick={() => handleNavClick('cms')}
+              className={`px-3 py-2 rounded-lg transition flex items-center gap-1.5 relative border border-blue-200 dark:border-blue-900/60 ${
+                currentTab === 'cms'
+                  ? 'text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-950 font-bold'
+                  : 'text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+              }`}
+            >
+              <Sliders className="w-4 h-4 text-amber-500" />
+              <span>Quản lý CMS</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500 text-white font-mono font-bold">
+                Admin
+              </span>
+            </button>
+          )}
+
           <button
             onClick={() => handleNavClick('about')}
             className={`px-3 py-2 rounded-lg transition flex items-center gap-1.5 ${
@@ -184,6 +200,23 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action Buttons */}
         <div className="flex items-center space-x-2">
+          {/* Admin status pill / Logout button */}
+          {isAdmin ? (
+            <div className="hidden sm:flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-lg px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-300">
+              <Shield className="w-3.5 h-3.5 text-amber-500" />
+              <span className="font-semibold text-[11px]">Admin Đã Xác Thực</span>
+              {onAdminLogout && (
+                <button
+                  onClick={onAdminLogout}
+                  title="Đăng xuất khỏi phiên Quản trị"
+                  className="ml-1 p-1 hover:bg-amber-200/60 dark:hover:bg-amber-900/80 rounded transition cursor-pointer text-slate-600 dark:text-slate-300"
+                >
+                  <LogOut className="w-3 h-3 text-rose-500" />
+                </button>
+              )}
+            </div>
+          ) : null}
+
           {/* Dark Mode Toggle */}
           <button
             onClick={onToggleTheme}
@@ -243,12 +276,20 @@ export const Header: React.FC<HeaderProps> = ({
             >
               Chuyên đề kỹ thuật
             </button>
-            <button
-              onClick={() => handleNavClick('cms')}
-              className="text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold"
-            >
-              Quản lý CMS & Danh mục
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => handleNavClick('cms')}
+                className="text-left px-3 py-2 rounded-lg bg-blue-50/80 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-amber-500" />
+                  Quản lý CMS & Danh mục
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-white font-mono">
+                  Admin
+                </span>
+              </button>
+            )}
             <button
               onClick={() => handleNavClick('about')}
               className="text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -261,6 +302,19 @@ export const Header: React.FC<HeaderProps> = ({
             >
               Liên hệ tư vấn
             </button>
+
+            {isAdmin && onAdminLogout && (
+              <button
+                onClick={() => {
+                  onAdminLogout();
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left px-3 py-2 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-medium flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-800"
+              >
+                <LogOut className="w-4 h-4" />
+                Đăng xuất Quản trị viên
+              </button>
+            )}
           </div>
         </div>
       )}

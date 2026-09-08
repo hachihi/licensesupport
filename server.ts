@@ -10,6 +10,58 @@ async function startServer() {
 
   app.use(express.json());
 
+  // --- ADMIN AUTHENTICATION CONFIGURATION ---
+  let runtimeAdminPassword = process.env.ADMIN_PASSWORD || 'admin@licensetech2026';
+  let runtimeAdminToken = 'licensetech_adm_' + Buffer.from(runtimeAdminPassword).toString('base64');
+
+  const requireAdminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    if (token && token === runtimeAdminToken) {
+      return next();
+    }
+    return res.status(401).json({
+      error: 'Không có quyền truy cập. Yêu cầu xác thực tài khoản Quản trị viên.',
+    });
+  };
+
+  // Auth: Admin Login
+  app.post('/api/auth/login', (req, res) => {
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ error: 'Vui lòng nhập mật khẩu quản trị' });
+    }
+    if (password === runtimeAdminPassword) {
+      return res.json({
+        success: true,
+        token: runtimeAdminToken,
+        user: { role: 'admin', name: 'Quản Trị Viên LicenseTech' },
+      });
+    }
+    return res.status(401).json({ error: 'Mật khẩu quản trị không chính xác' });
+  });
+
+  // Auth: Verify current token
+  app.post('/api/auth/verify', (req, res) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    if (token && token === runtimeAdminToken) {
+      return res.json({ valid: true, role: 'admin' });
+    }
+    return res.json({ valid: false });
+  });
+
+  // Auth: Change Admin Password (requires current admin auth)
+  app.post('/api/auth/change-password', requireAdminAuth, (req, res) => {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+    }
+    runtimeAdminPassword = newPassword;
+    runtimeAdminToken = 'licensetech_adm_' + Buffer.from(newPassword).toString('base64');
+    return res.json({ success: true, newToken: runtimeAdminToken });
+  });
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -20,7 +72,7 @@ async function startServer() {
     res.json(dataStore.getCategories());
   });
 
-  app.post('/api/categories', (req, res) => {
+  app.post('/api/categories', requireAdminAuth, (req, res) => {
     try {
       const { name, slug, description, icon, color } = req.body;
       if (!name) {
@@ -39,7 +91,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/categories/:id', (req, res) => {
+  app.put('/api/categories/:id', requireAdminAuth, (req, res) => {
     const updated = dataStore.updateCategory(req.params.id, req.body);
     if (!updated) {
       return res.status(404).json({ error: 'Không tìm thấy danh mục' });
@@ -47,7 +99,7 @@ async function startServer() {
     res.json({ category: updated });
   });
 
-  app.delete('/api/categories/:id', (req, res) => {
+  app.delete('/api/categories/:id', requireAdminAuth, (req, res) => {
     const success = dataStore.deleteCategory(req.params.id);
     if (!success) {
       return res.status(404).json({ error: 'Không tìm thấy danh mục' });
@@ -75,7 +127,7 @@ async function startServer() {
     res.json({ article });
   });
 
-  app.post('/api/articles', (req, res) => {
+  app.post('/api/articles', requireAdminAuth, (req, res) => {
     try {
       const { title, categoryId, summary, content, tags, difficulty, status, relatedErrorCodes, commands } = req.body;
       if (!title || !categoryId || !content) {
@@ -100,7 +152,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/articles/:id', (req, res) => {
+  app.put('/api/articles/:id', requireAdminAuth, (req, res) => {
     const updated = dataStore.updateArticle(req.params.id, req.body);
     if (!updated) {
       return res.status(404).json({ error: 'Không tìm thấy bài viết' });
@@ -108,7 +160,7 @@ async function startServer() {
     res.json({ article: updated });
   });
 
-  app.delete('/api/articles/:id', (req, res) => {
+  app.delete('/api/articles/:id', requireAdminAuth, (req, res) => {
     const success = dataStore.deleteArticle(req.params.id);
     if (!success) {
       return res.status(404).json({ error: 'Không tìm thấy bài viết' });
@@ -116,15 +168,15 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // --- GEMINI KEY POOL MANAGEMENT API ---
-  app.get('/api/keys', (req, res) => {
+  // --- GEMINI KEY POOL MANAGEMENT API (ADMIN ONLY) ---
+  app.get('/api/keys', requireAdminAuth, (req, res) => {
     res.json({
       keys: keyPool.getMaskedKeys(),
       failoverHistory: keyPool.getFailoverHistory(),
     });
   });
 
-  app.post('/api/keys/add', (req, res) => {
+  app.post('/api/keys/add', requireAdminAuth, (req, res) => {
     try {
       const { key, label } = req.body;
       if (!key) {
@@ -137,7 +189,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/keys/test', async (req, res) => {
+  app.post('/api/keys/test', requireAdminAuth, async (req, res) => {
     try {
       const { id } = req.body;
       if (!id) {
@@ -150,7 +202,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/keys/reset', (req, res) => {
+  app.post('/api/keys/reset', requireAdminAuth, (req, res) => {
     const { id } = req.body;
     const ok = keyPool.resetKeyStatus(id);
     res.json({ success: ok });
@@ -243,11 +295,11 @@ Nhiệm vụ của bạn:
     }
   });
 
-  app.get('/api/contact', (req, res) => {
+  app.get('/api/contact', requireAdminAuth, (req, res) => {
     res.json(dataStore.getContactInquiries());
   });
 
-  app.get('/api/inquiries', (req, res) => {
+  app.get('/api/inquiries', requireAdminAuth, (req, res) => {
     res.json(dataStore.getContactInquiries());
   });
 

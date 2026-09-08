@@ -9,8 +9,9 @@ import { AboutView } from './components/AboutView';
 import { ContactView } from './components/ContactView';
 import { ArticleDetailModal } from './components/ArticleDetailModal';
 import { ChatbotDrawer } from './components/ChatbotDrawer';
+import { AdminLoginModal } from './components/AdminLoginModal';
 import { INITIAL_CATEGORIES, INITIAL_ARTICLES, INITIAL_KEYS } from './data/initialData';
-import { Bot, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Bot, Sparkles, AlertCircle, CheckCircle2, Lock, ShieldCheck } from 'lucide-react';
 
 export default function App() {
   // Theme state
@@ -25,6 +26,16 @@ export default function App() {
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'home' | 'articles' | 'cms' | 'about' | 'contact'>('home');
+
+  // Admin Authentication State
+  const [adminToken, setAdminToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('licensetech_admin_token');
+    }
+    return null;
+  });
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
 
   // Core Data States with resilient initial values
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
@@ -75,15 +86,68 @@ export default function App() {
     return null;
   };
 
-  // Fetch initial data
-  const loadData = async () => {
+  // Verify Admin Token with server
+  useEffect(() => {
+    const verifyToken = async () => {
+      if (!adminToken) {
+        setIsAdmin(false);
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${adminToken}`,
+          },
+        });
+        const data = await safeJson(res);
+        if (data && data.valid) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+          setAdminToken(null);
+          localStorage.removeItem('licensetech_admin_token');
+        }
+      } catch {
+        // If network error, preserve local token
+        setIsAdmin(true);
+      }
+    };
+    verifyToken();
+  }, [adminToken]);
+
+  // URL Hash shortcut check (e.g. #admin, #cms, #login)
+  useEffect(() => {
+    const handleHashCheck = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#admin' || hash === '#login' || hash === '#cms') {
+        if (!isAdmin) {
+          setIsAdminLoginModalOpen(true);
+        } else {
+          setActiveTab('cms');
+        }
+      }
+    };
+    handleHashCheck();
+    window.addEventListener('hashchange', handleHashCheck);
+    return () => window.removeEventListener('hashchange', handleHashCheck);
+  }, [isAdmin]);
+
+  // Fetch initial data (attaches token if available for protected keys/inquiries)
+  const loadData = async (tokenOverride?: string) => {
+    const currentToken = tokenOverride || adminToken;
+    const authHeaders: HeadersInit = currentToken
+      ? { Authorization: `Bearer ${currentToken}` }
+      : {};
+
     try {
       setLoading(true);
       const [catRes, artRes, keyRes, inqRes] = await Promise.allSettled([
         fetch('/api/categories'),
         fetch('/api/articles'),
-        fetch('/api/keys'),
-        fetch('/api/inquiries'),
+        fetch('/api/keys', { headers: authHeaders }),
+        fetch('/api/inquiries', { headers: authHeaders }),
       ]);
 
       if (catRes.status === 'fulfilled' && catRes.value.ok) {
@@ -142,7 +206,42 @@ export default function App() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [adminToken]);
+
+  // Handle Admin Login Action
+  const handleAdminLogin = async (password: string) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Mật khẩu quản trị không chính xác' };
+      }
+      setAdminToken(data.token);
+      setIsAdmin(true);
+      localStorage.setItem('licensetech_admin_token', data.token);
+      showToast('Xác thực quyền Quản trị viên thành công!', 'success');
+      setActiveTab('cms');
+      await loadData(data.token);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Lỗi kết nối máy chủ' };
+    }
+  };
+
+  // Handle Admin Logout Action
+  const handleAdminLogout = () => {
+    setAdminToken(null);
+    setIsAdmin(false);
+    localStorage.removeItem('licensetech_admin_token');
+    if (activeTab === 'cms') {
+      setActiveTab('home');
+    }
+    showToast('Đã đăng xuất khỏi phiên Quản trị viên', 'success');
+  };
 
   // Global search trigger
   const handleGlobalSearch = (query: string) => {
@@ -178,10 +277,18 @@ export default function App() {
 
   // CMS: Article Save
   const handleSaveArticle = async (artData: Partial<Article>): Promise<boolean> => {
+    if (!adminToken) {
+      showToast('Yêu cầu đăng nhập Quản trị viên để lưu bài viết!', 'error');
+      setIsAdminLoginModalOpen(true);
+      return false;
+    }
     try {
       const res = await fetch('/api/articles', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
         body: JSON.stringify(artData),
       });
       const data = await res.json();
@@ -197,8 +304,18 @@ export default function App() {
 
   // CMS: Article Delete
   const handleDeleteArticle = async (id: string): Promise<boolean> => {
+    if (!adminToken) {
+      showToast('Yêu cầu đăng nhập Quản trị viên để xóa bài viết!', 'error');
+      setIsAdminLoginModalOpen(true);
+      return false;
+    }
     try {
-      const res = await fetch(`/api/articles/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/articles/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Không thể xóa bài viết');
       showToast('Đã xóa bài viết!', 'success');
@@ -212,10 +329,18 @@ export default function App() {
 
   // CMS: Category Save
   const handleSaveCategory = async (catData: Partial<Category>): Promise<boolean> => {
+    if (!adminToken) {
+      showToast('Yêu cầu đăng nhập Quản trị viên để lưu danh mục!', 'error');
+      setIsAdminLoginModalOpen(true);
+      return false;
+    }
     try {
       const res = await fetch('/api/categories', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
         body: JSON.stringify(catData),
       });
       const data = await res.json();
@@ -231,8 +356,18 @@ export default function App() {
 
   // CMS: Category Delete
   const handleDeleteCategory = async (id: string): Promise<boolean> => {
+    if (!adminToken) {
+      showToast('Yêu cầu đăng nhập Quản trị viên để xóa danh mục!', 'error');
+      setIsAdminLoginModalOpen(true);
+      return false;
+    }
     try {
-      const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/categories/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Không thể xóa danh mục');
       showToast('Đã xóa danh mục!', 'success');
@@ -246,10 +381,18 @@ export default function App() {
 
   // CMS: Add Backup Key
   const handleAddBackupKey = async (key: string, label: string) => {
+    if (!adminToken) {
+      showToast('Yêu cầu đăng nhập Quản trị viên để cấu hình Key!', 'error');
+      setIsAdminLoginModalOpen(true);
+      return { success: false, message: 'Yêu cầu quyền Quản trị viên' };
+    }
     try {
       const res = await fetch('/api/keys/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
         body: JSON.stringify({ key, label }),
       });
       const data = await res.json();
@@ -263,10 +406,16 @@ export default function App() {
 
   // CMS: Test Key Ping
   const handleTestKey = async (id: string) => {
+    if (!adminToken) {
+      return { success: false, message: 'Yêu cầu quyền Quản trị viên', latencyMs: 0 };
+    }
     try {
       const res = await fetch('/api/keys/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
         body: JSON.stringify({ id }),
       });
       const data = await res.json();
@@ -283,10 +432,18 @@ export default function App() {
 
   // CMS: Reset Key Status
   const handleResetKey = async (id: string): Promise<boolean> => {
+    if (!adminToken) {
+      showToast('Yêu cầu quyền Quản trị viên!', 'error');
+      setIsAdminLoginModalOpen(true);
+      return false;
+    }
     try {
       const res = await fetch('/api/keys/reset', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
         body: JSON.stringify({ id }),
       });
       const data = await res.json();
@@ -352,6 +509,9 @@ export default function App() {
           handleGlobalSearch(q);
         }}
         activeKeyCount={activeKeysCount}
+        isAdmin={isAdmin}
+        onOpenAdminLogin={() => setIsAdminLoginModalOpen(true)}
+        onAdminLogout={handleAdminLogout}
       />
 
       {/* Main Content View Switcher */}
@@ -383,20 +543,53 @@ export default function App() {
         )}
 
         {activeTab === 'cms' && (
-          <AdminCMS
-            categories={categories}
-            articles={articles}
-            keyPoolItems={keyPoolItems}
-            inquiries={inquiries}
-            onRefreshData={loadData}
-            onSaveArticle={handleSaveArticle}
-            onDeleteArticle={handleDeleteArticle}
-            onSaveCategory={handleSaveCategory}
-            onDeleteCategory={handleDeleteCategory}
-            onAddBackupKey={handleAddBackupKey}
-            onTestKey={handleTestKey}
-            onResetKey={handleResetKey}
-          />
+          isAdmin ? (
+            <AdminCMS
+              categories={categories}
+              articles={articles}
+              keyPoolItems={keyPoolItems}
+              inquiries={inquiries}
+              onRefreshData={() => loadData()}
+              onSaveArticle={handleSaveArticle}
+              onDeleteArticle={handleDeleteArticle}
+              onSaveCategory={handleSaveCategory}
+              onDeleteCategory={handleDeleteCategory}
+              onAddBackupKey={handleAddBackupKey}
+              onTestKey={handleTestKey}
+              onResetKey={handleResetKey}
+            />
+          ) : (
+            <div className="max-w-xl mx-auto my-16 px-4">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-8 text-center space-y-5">
+                <div className="w-16 h-16 mx-auto bg-amber-50 dark:bg-amber-950/60 text-amber-500 rounded-2xl flex items-center justify-center shadow-inner">
+                  <Lock className="w-8 h-8" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                    Khu Vực Quản Trị Hệ Thống Giới Hạn
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Trang Quản Trị Nội Dung (CMS) & Cấu Hình Multi-Key Gemini yêu cầu quyền Quản trị viên. Người dùng và khách thường không thể truy cập hoặc chỉnh sửa khu vực này.
+                  </p>
+                </div>
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={() => setActiveTab('home')}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition cursor-pointer"
+                  >
+                    Về Trang Chủ
+                  </button>
+                  <button
+                    onClick={() => setIsAdminLoginModalOpen(true)}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md shadow-blue-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>Đăng Nhập Quản Trị Viên</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
         )}
 
         {activeTab === 'about' && (
@@ -418,6 +611,16 @@ export default function App() {
       <Footer
         onSelectCategory={handleSelectCategory}
         onOpenErrorCode={handleOpenErrorCode}
+        isAdmin={isAdmin}
+        onOpenAdminLogin={() => setIsAdminLoginModalOpen(true)}
+        onAdminLogout={handleAdminLogout}
+      />
+
+      {/* Admin Login Modal */}
+      <AdminLoginModal
+        isOpen={isAdminLoginModalOpen}
+        onClose={() => setIsAdminLoginModalOpen(false)}
+        onLogin={handleAdminLogin}
       />
 
       {/* Article Detail Reader Modal */}

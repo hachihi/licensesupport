@@ -1,12 +1,21 @@
 import React from 'react';
-import { ShieldCheck, PhoneCall, Mail, MapPin, ExternalLink, Award, FileCode, CheckCircle } from 'lucide-react';
+import { ShieldCheck, PhoneCall, Mail, MapPin, ExternalLink, Award, FileCode, CheckCircle, Lock, Shield } from 'lucide-react';
 
 interface FooterProps {
   onSelectCategory?: (slug: string) => void;
   onOpenErrorCode?: (code: string) => void;
+  isAdmin?: boolean;
+  onOpenAdminLogin?: () => void;
+  onAdminLogout?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onSelectCategory, onOpenErrorCode }) => {
+export const Footer: React.FC<FooterProps> = ({
+  onSelectCategory,
+  onOpenErrorCode,
+  isAdmin = false,
+  onOpenAdminLogin,
+  onAdminLogout,
+}) => {
   return (
     <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400 transition-colors">
       {/* Top Value Banner */}
@@ -189,12 +198,31 @@ export const Footer: React.FC<FooterProps> = ({ onSelectCategory, onOpenErrorCod
         {/* Bottom Copyright */}
         <div className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-3">
           <p>© 2026 LICENSETECH VN. Bản quyền thuộc về Chuyên trang Kỹ thuật Bản quyền Phần mềm Việt Nam.</p>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-wrap items-center space-x-3">
             <span className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Chính sách bảo mật</span>
             <span>•</span>
             <span className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Điều khoản sử dụng</span>
             <span>•</span>
             <span className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Quy chuẩn SHTT Việt Nam</span>
+            <span>•</span>
+            {isAdmin ? (
+              <button
+                onClick={onAdminLogout}
+                className="hover:text-rose-500 text-amber-600 dark:text-amber-400 font-semibold cursor-pointer flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/60"
+              >
+                <Shield className="w-3 h-3" />
+                <span>Admin (Đăng xuất)</span>
+              </button>
+            ) : (
+              <button
+                onClick={onOpenAdminLogin}
+                className="hover:text-blue-600 dark:hover:text-blue-400 text-slate-400 hover:underline cursor-pointer flex items-center gap-1"
+                title="Cổng đăng nhập dành riêng cho Quản trị viên"
+              >
+                <Lock className="w-3 h-3" />
+                <span>Cổng Quản Trị</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
